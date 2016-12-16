@@ -1,4 +1,4 @@
-FROM mesoscloud/zookeeper:3.4.6-ubuntu
+FROM mesoscloud/zookeeper:3.4.8-ubuntu
 
 MAINTAINER ContainerShip Developers <developers@containership.io>
 
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install curl npm -y
 
 # install node
 RUN npm install -g n
-RUN n 0.10.38
+RUN n 6.9.2
 
 # create /app and add files
 WORKDIR /app

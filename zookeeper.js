@@ -1,31 +1,33 @@
-var fs = require("fs");
-var os = require("os");
-var _ = require("lodash");
-var async = require("async");
-var dns = require("native-dns");
-var request = require("request");
-var child_process = require("child_process");
+'use strict';
+
+const _ = require('lodash');
+const async = require('async');
+const child_process = require('child_process');
+const dns = require('native-dns');
+const fs = require('fs');
+const os = require('os');
+const request = require('request');
 
 async.parallel({
-    CLUSTER_LEADER: function(fn){
-        var question = dns.Question({
-          name: ["leaders", process.env.CS_CLUSTER_ID, "containership"].join("."),
-          type: "A"
+    CLUSTER_LEADER: (fn) => {
+        const question = dns.Question({
+          name: ['leaders', process.env.CS_CLUSTER_ID, 'containership'].join('.'),
+          type: 'A'
         });
 
-        var req = dns.Request({
+        const req = dns.Request({
             question: question,
-            server: { address: "127.0.0.1", port: 53, type: "udp" },
+            server: { address: '127.0.0.1', port: 53, type: 'udp' },
             timeout: 2000
         });
 
-        req.on("timeout", function(){
+        req.on('timeout', () => {
             return fn();
         });
 
-        req.on("message", function (err, answer) {
-            var addresses = [];
-            answer.answer.forEach(function(a){
+        req.on('message', (err, answer) => {
+            const addresses = [];
+            answer.answer.forEach((a) => {
                 addresses.push(a.address);
             });
 
@@ -34,84 +36,83 @@ async.parallel({
 
         req.send();
     }
-}, function(err, zookeeper){
+}, (err, zookeeper) => {
     _.merge(zookeeper, process.env);
 
     _.defaults(zookeeper, {});
 
-    var options = {
-        url: ["http:/", [zookeeper.CLUSTER_LEADER, "8080"].join(":"), "v1", "hosts"].join("/"),
-        method: "GET",
+    const options = {
+        url: ['http:/', [zookeeper.CLUSTER_LEADER, '8080'].join(':'), 'v1', 'hosts'].join('/'),
+        method: 'GET',
         json: true,
         timeout: 5000
     }
 
     async.waterfall([
-        function(fn){
-            request(options, function(err, response){
+        (fn) => {
+            request(options, (err, response) => {
                 if(err)
                     return fn(err);
                 else if(response && response.statusCode != 200)
-                    return fn(new Error("Received non-200 status code from leader!"));
+                    return fn(new Error('Received non-200 status code from leader!'));
                 else{
-                    var hosts = _.values(response.body);
+                    let hosts = _.values(response.body);
 
-                    hosts = _.filter(hosts, { mode: "follower" });
+                    hosts = _.filter(hosts, { mode: 'follower' });
 
-                    var this_host = _.find(hosts, function(host){
+                    const this_host = _.find(hosts, (host) => {
                         return host.host_name == os.hostname();
                     });
 
-                    hosts = _.filter(hosts, function(host){
+                    hosts = _.filter(hosts, (host) => {
                         return host.host_name != os.hostname();
                     });
 
-                    var count = 1;
+                    let count = 1;
 
-                    var files = {
-
+                    const files = {
                         zoo_cfg: _.flatten([
-                            "tickTime=2000",
-                            "initLimit=10",
-                            "syncLimit=5",
-                            "dataDir=/tmp/zookeeper",
-                            "clientPort=2181",
-                            ["server.", this_host.address.private.split(".").join(""), "=" , this_host.address.private, ":2888:3888"].join(""),
-                            _.map(hosts, function(host){
+                            'tickTime=2000',
+                            'initLimit=10',
+                            'syncLimit=5',
+                            'dataDir=/tmp/zookeeper',
+                            'clientPort=2181',
+                            ['server.', this_host.address.private.split('.').join(''), '=' , this_host.address.private, ':2888:3888'].join(''),
+                            _.map(hosts, (host) => {
                                 count++;
-                                return ["server.", host.address.private.split(".").join(""), "=", host.address.private, ":2888:3888"].join("");
+                                return ['server.', host.address.private.split('.').join(''), '=', host.address.private, ':2888:3888'].join('');
                             })
-                        ]).join("\n"),
+                        ]).join('\n'),
 
-                        my_id: this_host.address.private.split(".").join("")
+                        my_id: this_host.address.private.split('.').join('')
                     }
 
                     return fn(null, files);
                 }
             });
         },
-        function(files, fn){
+        (files, fn) => {
             async.parallel([
-                function(fn){
-                    fs.writeFile("/opt/zookeeper/conf/zoo.cfg", files.zoo_cfg, fn);
+                (fn) => {
+                    fs.writeFile('/opt/zookeeper/conf/zoo.cfg', files.zoo_cfg, fn);
                 },
-                function(fn){
-                    fs.writeFile("/tmp/zookeeper/myid", files.my_id, fn);
+                (fn) => {
+                    fs.writeFile('/tmp/zookeeper/myid', files.my_id, fn);
                 }
             ], fn);
         },
-    ], function(err){
+    ], (err) => {
         if(err){
             process.stderr.write(err.message);
             process.exit(1);
         }
 
-        var proc = child_process.spawn(["", "opt", "zookeeper", "bin", "zkServer.sh"].join("/"), [ "start-foreground" ]);
+        const proc = child_process.spawn(['', 'opt', 'zookeeper', 'bin', 'zkServer.sh'].join('/'), [ 'start-foreground' ]);
 
         proc.stdout.pipe(process.stdout);
         proc.stderr.pipe(process.stderr);
 
-        proc.on("error", function(err){
+        proc.on('error', (err) => {
             process.stderr.write(err.message);
             process.exit(1);
         });
