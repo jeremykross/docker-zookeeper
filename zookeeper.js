@@ -42,11 +42,11 @@ async.parallel({
     _.defaults(zookeeper, {});
 
     const options = {
-        url: ['http:/', [zookeeper.CLUSTER_LEADER, '8080'].join(':'), 'v1', 'hosts'].join('/'),
+        url: `http://${zookeeper.CLUSTER_LEADER}/v1/hosts`,
         method: 'GET',
         json: true,
         timeout: 5000
-    }
+    };
 
     async.waterfall([
         (fn) => {
