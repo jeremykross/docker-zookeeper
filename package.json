@@ -1,5 +1,5 @@
 {
-  "name": "docker-zookeeper",
+  "name": "@containership/containership.marketplace.zookeeper",
   "private": true,
   "description": "Docker image designed to run a zookeeper cluster on ContainerShip",
   "main": "zookeeper.js",
